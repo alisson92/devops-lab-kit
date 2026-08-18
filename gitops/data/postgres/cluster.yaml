@@ -37,6 +37,25 @@
 # bootstrapping is complete" — safe to declare from this Cluster's first
 # sync onward, not just on a freshly-bootstrapped one.
 #
+# spec.managed.roles (post-Phase-7 hardening, issue #64): a THIRD entry,
+# "orders" — the same role already created once via bootstrap.initdb above.
+# Root cause of #64: bootstrap.initdb only APPLIES a password at cluster
+# creation time; it is not reconciled afterwards, so a manual `ALTER ROLE`
+# (or any other drift between the live role and Vault's cached password)
+# is never healed by the operator. That is exactly what happened during
+# the PR #63 live validation and required a manual recovery. Putting
+# "orders" under spec.managed.roles closes that gap the same way "airflow"
+# already does above (ADR-019 precedent) — CNPG reconciles the role's
+# password continuously against passwordSecret, not just once. Reusing
+# "postgres-app-credentials" (the SAME Secret already read by
+# bootstrap.initdb.secret) rather than a dedicated Secret is deliberate:
+# nothing in the CNPG 1.30 docs requires a distinct Secret per managed
+# role, and this Secret's `username` key is already "orders", satisfying
+# the "username must match role name" requirement. "orders" is also not on
+# CNPG's reserved-role list (postgres, streaming_replica,
+# cnpg_pooler_pgbouncer), so it is eligible for declarative management
+# with no caveat.
+#
 # Docs consulted:
 # - https://cloudnative-pg.io/documentation/current/bootstrap/
 #   (bootstrap.initdb: database/owner/secret.name; secret must be
@@ -44,10 +63,11 @@
 # - https://cloudnative-pg.io/documentation/current/cloudnative-pg.v1/
 #   (spec.instances, spec.storage.size, spec.resources use core/v1
 #   ResourceRequirements)
-# - https://cloudnative-pg.io/docs/1.27/declarative_role_management/
+# - https://cloudnative-pg.io/docs/1.30/declarative_role_management/
 #   (spec.managed.roles: name/ensure/login/passwordSecret.name; password
 #   Secret type kubernetes.io/basic-auth, username must match role name;
-#   role creation deferred until after database bootstrapping)
+#   role creation deferred until after database bootstrapping; reserved
+#   roles: postgres, streaming_replica, cnpg_pooler_pgbouncer)
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -96,3 +116,9 @@ spec:
         superuser: false
         passwordSecret:
           name: airflow-postgres-role-credentials
+      - name: orders
+        ensure: present
+        login: true
+        superuser: false
+        passwordSecret:
+          name: postgres-app-credentials
