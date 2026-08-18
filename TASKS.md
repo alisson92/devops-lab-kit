@@ -117,6 +117,13 @@
   All exit gates confirmed live: Vault survives a restart with one manual
   unseal, backend target `up` in Prometheus with a queryable metric,
   mermaid-lint fails a broken diagram and passes the real repo.
+- (data-engineer) Closed follow-up issue #64: added `orders` to
+  `cluster.yaml`'s `spec.managed.roles`, reusing `postgres-app-credentials`
+  (same Secret as `bootstrap.initdb`), same pattern as `airflow` (ADR-019).
+  CNPG now reconciles the `orders` password continuously instead of only at
+  bootstrap. Live-checked on Kind: current role password already matches
+  the cached Secret, so the first reconciliation is a no-op. PR: see
+  branch `fix/postgres-orders-managed-role`.
 
 ## Log
 

@@ -32,7 +32,10 @@ app-user credentials (`username=orders`, matching `cluster.yaml`'s
 `postgres-read` policy (extended in Phase 7 to also read
 `secret/data/airflow`, for `airflow-role-externalsecret.yaml`), and the
 `postgres` role, along with secrets-demo/Redis/backend/airflow's setup in
-the same run:
+the same run. As of the post-Phase-7 hardening round (issue #64), `orders`
+is now also under `cluster.yaml`'s `spec.managed.roles`, so its live
+password is continuously reconciled against `postgres-app-credentials` —
+not just applied once at bootstrap:
 
 ```sh
 ./scripts/bootstrap-vault.sh
@@ -67,4 +70,7 @@ kubectl -n postgres exec -it postgres-1 -- psql -U orders -d orders -c 'SELECT 1
 # Confirms the app user/database bootstrapped from the Vault-sourced
 # secret. Do not paste any credential value into TASKS.md, commit
 # messages, or any other committed file.
+
+kubectl -n postgres get cluster postgres -o jsonpath='{.status.managedRolesStatus}'
+# "orders" and "airflow" should both appear under byStatus.reconciled.
 ```
